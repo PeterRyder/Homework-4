@@ -179,10 +179,10 @@ void generate_matrix() {
 		}
         
         //send row data to other ranks
-        for(int rank_iter = 0; i < g_commsize; i++)
+        for(int rank_iter = 0; rank_iter < g_commsize; i++)
         {
             MPI_Request request;
-            MPI_Isend(&(g_matrix[row][k*g_rows_per_rank]), g_rows_per_rank, MPI_UNSIGNED, rank_iter, g_my_rank*rank_iter+rank_iter, MPI_COMM_WORLD, &request);
+            MPI_Isend(&(g_matrix[row][rank_iter*g_rows_per_rank]), g_rows_per_rank, MPI_UNSIGNED, rank_iter, g_my_rank*rank_iter+rank_iter, MPI_COMM_WORLD, &request);
             MPI_Request_free(&request);
         }
 	}
@@ -242,8 +242,8 @@ void cleanup() {
 void write_single_file()
 {
     MPI_Status file_status;
-    MPI_file output_file;
-    char* filename = "test_out.txt" //REPLACE ME
+    MPI_File output_file;
+    char* filename = "test_out.txt"; //REPLACE ME
     
     unsigned int err = MPI_File_open(MPI_COMM_WORLD, filename, MPI_MODE_CREATE | MPI_MODE_WRONGLY, MPI_INFO_NULL, &output_file);
     if (err != MPI_SUCCESS)
@@ -275,7 +275,7 @@ void write_single_file()
 void write_multiple_files()
 {
     MPI_Status file_status;
-    MPI_file output_file;
+    MPI_File output_file;
     MPI_Comm mpi_comm_file;
     
     //SHARE FLIE
