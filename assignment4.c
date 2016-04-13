@@ -179,7 +179,7 @@ void generate_matrix() {
 		}
         
         //send row data to other ranks
-        for(int rank_iter = 0; rank_iter < g_commsize; i++)
+        for(int rank_iter = 0; rank_iter < g_commsize; rank_iter++)
         {
             MPI_Request request;
             MPI_Isend(&(g_matrix[row][rank_iter*g_rows_per_rank]), g_rows_per_rank, MPI_UNSIGNED, rank_iter, g_my_rank*rank_iter+rank_iter, MPI_COMM_WORLD, &request);
@@ -245,7 +245,7 @@ void write_single_file()
     MPI_File output_file;
     char* filename = "test_out.txt"; //REPLACE ME
     
-    unsigned int err = MPI_File_open(MPI_COMM_WORLD, filename, MPI_MODE_CREATE | MPI_MODE_WRONGLY, MPI_INFO_NULL, &output_file);
+    unsigned int err = MPI_File_open(MPI_COMM_WORLD, filename, MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &output_file);
     if (err != MPI_SUCCESS)
     {
         printf("MPI_FILE_OPEN ERROR PANIC\n");
