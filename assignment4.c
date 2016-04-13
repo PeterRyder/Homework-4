@@ -1,5 +1,5 @@
 // Assignment 4/5
-// Peter, Brian
+// Peter Ryder, Brian Kovacik, Matt
 
 /* INCLUDES */
 #include <stdio.h>
@@ -9,9 +9,10 @@
 #include <math.h>
 #include <stdbool.h>
 #include <limits.h>
+#include <pthread.h>
 
-#include <clcg4.h>
-#include <mpi.h>
+#include "clcg4.h"
+//#include <mpi.h>
 
 #define CELL_TYPE unsigned int
 #define MULTIPLIER 1000 /* will generate ints between 0 and multiplier */
@@ -20,6 +21,7 @@
 void generate_matrix();
 void print_matrix();
 void compute_transpose();
+void* sum(void* args);
 void cleanup();
 
 /* GLOBAL VARS */
@@ -62,9 +64,13 @@ int main(int argc, char* argv[]) {
 	/* create ranks here */
 	printf("Initializing MPI\n");
 
-	MPI_Init(&argc, &argv);
+/*	MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &g_commsize);
-    MPI_Comm_rank(MPI_COMM_WORLD, &g_my_rank);
+    MPI_Comm_rank(MPI_COMM_WORLD, &g_my_rank);*/
+
+//take this out when running with ranks
+    g_my_rank=0;
+    g_commsize=1; 
 
     g_ranks = g_commsize;
 
@@ -78,7 +84,7 @@ int main(int argc, char* argv[]) {
     printf("Rank %d of %d has been started and a first Random Value of %lf\n", 
 	   g_my_rank, g_commsize, GenVal(g_my_rank));
 
-    MPI_Barrier(MPI_COMM_WORLD);
+//    MPI_Barrier(MPI_COMM_WORLD);
 
     g_rows_per_rank = g_matrix_size / g_commsize;
 
@@ -90,21 +96,40 @@ int main(int argc, char* argv[]) {
 	/* generate part of matrix for this rank */
 	generate_matrix();
 
-	MPI_Barrier(MPI_COMM_WORLD);
+//	MPI_Barrier(MPI_COMM_WORLD);
 
 	print_matrix();
 
 	/* compute transpose */
 	compute_transpose();
 
-	MPI_Barrier(MPI_COMM_WORLD);
+    pthread_t* threads;
+    int** ends = calloc(g_threads_per_rank, sizeof(int*));
+    unsigned int i;
+    for (i = 0; i < g_threads_per_rank; i++) {
+        ends[i] = calloc(2, sizeof(int));
+    }
+
+    threads = calloc(g_rows_per_rank-1, sizeof(pthread_t));
+    ends[0][0] = 0; ends[0][1] = g_rows_per_rank/g_threads_per_rank;
+    sum(ends[0]);
+    for (i = 1; i < g_threads_per_rank; i++) {
+        ends[i][0] = g_rows_per_rank/g_threads_per_rank*i; ends[i][1] = g_rows_per_rank/g_threads_per_rank*(i+1);
+        pthread_create(threads+i-1, NULL, &sum, ends[i]);
+    }
+    for (i = 1; i < g_threads_per_rank; i++) {
+        pthread_join(threads[i-1], NULL);
+    }
+	print_matrix();
+
+//	MPI_Barrier(MPI_COMM_WORLD);
 
 	cleanup();
 #if DEBUG
 	printf("Matrix %d cleaned up\n", g_my_rank);
 #endif
 
-    MPI_Finalize();
+ //   MPI_Finalize();
 
 #if DEBUG
     if (g_my_rank == 0)
@@ -143,7 +168,19 @@ void compute_transpose() {
 		g_matrix_t[row] = calloc(g_matrix_size, sizeof(CELL_TYPE));
 
 		for (CELL_TYPE col = 0; col < g_matrix_size; col++) {
-			/* get transposed value */
+            g_matrix_t[row][col] = g_matrix[col][row];
+		}
+	}
+}
+
+void* sum(void* args) {
+    int ends[2]; ends[0]=*((int*)args); ends[1]=*((int*)args+1);
+#if DEBUG
+    fprintf(stderr, "I am thread %lu, responsible for rows %i to %i.\n", pthread_self(), ends[0], ends[1]);
+#endif
+	for (CELL_TYPE row = ends[0]; row < ends[1]; row++) {
+		for (CELL_TYPE col = 0; col < g_matrix_size; col++) {
+            g_matrix[row][col] += g_matrix_t[row][col];
 		}
 	}
 }
