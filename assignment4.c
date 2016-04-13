@@ -73,19 +73,19 @@ int main(int argc, char* argv[]) {
 	/* create ranks here */
 	printf("Initializing MPI\n");
 
-/*	MPI_Init(&argc, &argv);
     //Begin counting cycle time
     start_cycle_time = GetTimeBase();
     
 	MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &g_commsize);
-    MPI_Comm_rank(MPI_COMM_WORLD, &g_my_rank);*/
+    MPI_Comm_rank(MPI_COMM_WORLD, &g_my_rank);
 
 //take this out when running with ranks
     g_my_rank=0;
     g_commsize=1; 
 
     g_ranks = g_commsize;
+    g_rows_per_rank = g_matrix_size / g_commsize;
 
 #if DEBUG
     if (g_my_rank == 0)
@@ -97,9 +97,8 @@ int main(int argc, char* argv[]) {
     printf("Rank %d of %d has been started and a first Random Value of %lf\n", 
 	   g_my_rank, g_commsize, GenVal(g_my_rank));
 
-//    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(MPI_COMM_WORLD);
 
-    g_rows_per_rank = g_matrix_size / g_commsize;
 
 #if DEBUG
     if (g_my_rank == 0)
@@ -109,12 +108,13 @@ int main(int argc, char* argv[]) {
 	/* generate part of matrix for this rank */
 	generate_matrix();
 
-//	MPI_Barrier(MPI_COMM_WORLD);
+	MPI_Barrier(MPI_COMM_WORLD);
 
 	print_matrix();
 
 	/* compute transpose */
 	compute_transpose();
+    MPI_Barrier(MPI_COMM_WORLD);
 
     pthread_t* threads;
     int** ends = calloc(g_threads_per_rank, sizeof(int*));
@@ -135,7 +135,7 @@ int main(int argc, char* argv[]) {
     }
 	print_matrix();
 
-//	MPI_Barrier(MPI_COMM_WORLD);
+	MPI_Barrier(MPI_COMM_WORLD);
 
     //PRINT OUTPUT COMMENTED OUT UNTIL I GET A CHANCE TO TEST IT
 /*    if( g_commsize <= g_ranks_write_per_file )
@@ -176,6 +176,14 @@ void generate_matrix() {
 		for (CELL_TYPE col = 0; col < g_matrix_size; col++) {
 			g_matrix[row][col] = GenVal(g_my_rank) * MULTIPLIER;
 		}
+        
+        //send row data to other ranks
+        for(int rank_iter = 0; i < g_commsize; i++)
+        {
+            MPI_Request request;
+            MPI_Isend(&(g_matrix[row][k*g_rows_per_rank]), g_rows_per_rank, MPI_UNSIGNED, rank_iter, g_my_rank*rank_iter+rank_iter, MPI_COMM_WORLD, &request);
+            MPI_Request_free(&request);
+        }
 	}
 }
 
@@ -190,14 +198,24 @@ void print_matrix() {
 
 void compute_transpose() {
 	g_matrix_t = calloc(g_rows_per_rank, sizeof(CELL_TYPE *));
+    CELL_TYPE* temporary_row = calloc(g_rows_per_rank, sizeof(CELL_TYPE*));;
 
-	for (CELL_TYPE row = 0; row < g_rows_per_rank; row++) {
-		g_matrix_t[row] = calloc(g_matrix_size, sizeof(CELL_TYPE));
+    for (int rank_iter = 0; rank_iter < g_commsize; rank_iter++)
+    {
+        for (CELL_TYPE row = 0; row < g_rows_per_rank; row++) {
+            g_matrix_t[row] = calloc(g_matrix_size, sizeof(CELL_TYPE));
+            
+            MPI_Request request;
+            MPI_Status status;
+            MPI_Irecv(temporary_row, g_rows_per_rank, MPI_UNSIGNED, rank_iter, rank_iter*row+row, MPI_COMM_WORLD, &request);
+            MPI_Wait(&request, &status);
 
-		for (CELL_TYPE col = 0; col < g_matrix_size; col++) {
-            g_matrix_t[row][col] = g_matrix[col][row];
-		}
-	}
+            for (CELL_TYPE col = 0; col < g_matrix_size; col++) {
+                g_matrix_t[col][rank_iter*g_rows_per_rank + row] = temporary_row[col];
+            }
+        }
+    }
+    free(temporary_row);
 }
 
 void* sum(void* args) {
@@ -229,21 +247,24 @@ void write_single_file()
     unsigned int err = MPI_File_open(MPI_COMM_WORLD, filename, MPI_MODE_CREATE | MPI_MODE_WRONGLY, MPI_INFO_NULL, &output_file);
     if (err != MPI_SUCCESS)
     {
-        print_MPI_error(err, "MPI_File_open");
+        printf("MPI_FILE_OPEN ERROR PANIC\n");
+        MPI_Abort(MPI_COMM_WORLD, 1);
     }
     for(int i = 0; i < g_rows_per_rank; i++)
     {
         err = MPI_File_write_at_all(output_file, g_my_rank, matrix[i], g_matrix_size, MPI_FLOAT, &file_status);
         if (err != MPI_SUCCESS)
-        {
-            print_MPI_error(err, "MPI_File_write_at_all");
+        {        
+            printf("MPI_FILE_WRITE ERROR PANIC\n");
+            MPI_Abort(MPI_COMM_WORLD, 1);
         }
     }
     
     err = MPI_File_close(&output_file);
     if (err != MPI_SUCCESS)
     {
-        print_MPI_error(err, "MPI_File_close");
+        printf("MPI_FILE_CLOSE ERROR PANIC\n");
+        MPI_Abort(MPI_COMM_WORLD, 1);
     }
 }
 
