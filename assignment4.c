@@ -10,6 +10,7 @@
 #include <stdbool.h>
 #include <limits.h>
 #include <pthread.h>
+#include <cstring.h>
 
 #include "clcg4.h"
 #include <mpi.h>
@@ -276,7 +277,43 @@ void write_multiple_files()
 {
     MPI_Status file_status;
     MPI_File output_file;
-    MPI_Comm mpi_comm_file;
+    MPI_Comm comm_file;
+    int file_rank;
+    int file_comm_size;
+    int split_num = g_my_rank / g_ranks_write_per_file;
     
-    //SHARE FLIE
+    MPI_Comm_split(MPI_COMM_WORLD, split_num, g_my_rank, &comm_file);
+    MPI_Comm_rank(comm_file, &file_rank);
+    MPI_Comm_size(comm_file, &file_comm_size);
+    
+    char[30] filename;
+    sprintf(filename, "output%d", split_num);
+    
+    
+    unsigned int err = MPI_File_open(comm_file, filename, MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &output_file);
+    if (err != MPI_SUCCESS)
+    {
+        printf("MPI_FILE_OPEN ERROR PANIC\n");
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+    int rank_offset = g_my_rank*(g_matrix_size*g_rows_per_rank*sizeof(CELL_TYPE));
+    for(int i = 0; i < g_rows_per_rank; i++)
+    {
+        int offset = i*(g_matrix_size*g_rows_per_rank*sizeof(CELL_TYPE));
+        err = MPI_File_write_at(output_file, rank_offset + offset, g_matrix[i], g_matrix_size, MPI_UNSIGNED, &file_status);
+        if (err != MPI_SUCCESS)
+        {        
+            printf("MPI_FILE_WRITE ERROR PANIC\n");
+            MPI_Abort(MPI_COMM_WORLD, 1);
+        }
+    }
+    
+    err = MPI_File_close(&output_file);
+    if (err != MPI_SUCCESS)
+    {
+        printf("MPI_FILE_CLOSE ERROR PANIC\n");
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+    
+    MPI_Barrier(MPI_COMM_WORLD);
 }
