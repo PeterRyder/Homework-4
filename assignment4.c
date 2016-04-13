@@ -110,7 +110,7 @@ int main(int argc, char* argv[]) {
 
 	MPI_Barrier(MPI_COMM_WORLD);
 
-	print_matrix();
+	//print_matrix();
 
 	/* compute transpose */
 	compute_transpose();
@@ -133,11 +133,12 @@ int main(int argc, char* argv[]) {
     for (i = 1; i < g_threads_per_rank; i++) {
         pthread_join(threads[i-1], NULL);
     }
-	print_matrix();
+	//print_matrix();
 
 	MPI_Barrier(MPI_COMM_WORLD);
 
     //PRINT OUTPUT COMMENTED OUT UNTIL I GET A CHANCE TO TEST IT
+    write_single_file();
 /*    if( g_commsize <= g_ranks_write_per_file )
     {
         write_single_file(g_my_rank);
@@ -250,9 +251,11 @@ void write_single_file()
         printf("MPI_FILE_OPEN ERROR PANIC\n");
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
+    int rank_offset = g_my_rank*(g_matrix_size*g_rows_per_rank*sizeof(CELL_TYPE));
     for(int i = 0; i < g_rows_per_rank; i++)
     {
-        err = MPI_File_write_at_all(output_file, g_my_rank, matrix[i], g_matrix_size, MPI_FLOAT, &file_status);
+        int offset = i*(g_matrix_size*g_rows_per_rank*sizeof(CELL_TYPE));
+        err = MPI_File_write_at_all(output_file, rank_offset + offset, g_matrix[i], g_matrix_size, MPI_UNSIGNED, &file_status);
         if (err != MPI_SUCCESS)
         {        
             printf("MPI_FILE_WRITE ERROR PANIC\n");
