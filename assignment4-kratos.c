@@ -274,7 +274,7 @@ void write_multiple_files()
     MPI_Comm_rank(comm_file, &file_rank);
     MPI_Comm_size(comm_file, &file_comm_size);
     
-    char[30] filename;
+    char filename[30];
     sprintf(filename, "output%d", split_num);
     
     
