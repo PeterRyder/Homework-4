@@ -10,7 +10,7 @@
 #include <stdbool.h>
 #include <limits.h>
 #include <pthread.h>
-#include <cstring.h>
+#include <string.h>
 
 #include "clcg4.h"
 #include <mpi.h>
