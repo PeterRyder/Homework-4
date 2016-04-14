@@ -166,9 +166,10 @@ void generate_matrix() {
 		}
         
         //send row data to other ranks
-        for(int rank_iter = 0; rank_iter < g_commsize; rank_iter++) {
+        for(int rank_iter = 0; rank_iter < g_commsize; rank_iter++)
+        {
             MPI_Request request;
-            MPI_Isend(&(g_matrix[row][rank_iter*g_rows_per_rank]), g_rows_per_rank, MPI_UNSIGNED, rank_iter, g_my_rank*rank_iter+rank_iter, MPI_COMM_WORLD, &request);
+            MPI_Isend(&(g_matrix[row][rank_iter*g_rows_per_rank]), g_rows_per_rank, MPI_UNSIGNED, rank_iter, g_my_rank*row+row, MPI_COMM_WORLD, &request);
             MPI_Request_free(&request);
         }
 	}
@@ -185,25 +186,25 @@ void print_matrix() {
 
 void compute_transpose() {
 	g_matrix_t = calloc(g_rows_per_rank, sizeof(CELL_TYPE *));
-    CELL_TYPE* temporary_row = calloc(g_rows_per_rank, sizeof(CELL_TYPE *));
+    CELL_TYPE* temporary_row = calloc(g_rows_per_rank, sizeof(CELL_TYPE));;
+    for(unsigned int row = 0; row < g_rows_per_rank; row++)
+    {
+        g_matrix_t[row] = calloc(g_matrix_size, sizeof(CELL_TYPE));
+    }
 
-    for (int rank_iter = 0; rank_iter < g_commsize; rank_iter++) {
+    for (int rank_iter = 0; rank_iter < g_commsize; rank_iter++)
+    {
         for (CELL_TYPE row = 0; row < g_rows_per_rank; row++) {
-            g_matrix_t[row] = calloc(g_matrix_size, sizeof(CELL_TYPE));
-            
             MPI_Request request;
             MPI_Status status;
             MPI_Irecv(temporary_row, g_rows_per_rank, MPI_UNSIGNED, rank_iter, rank_iter*row+row, MPI_COMM_WORLD, &request);
             MPI_Wait(&request, &status);
 
-            printf("received mpi message\n");
-
-            for (CELL_TYPE col = 0; col < g_matrix_size; col++) {
+            for (CELL_TYPE col = 0; col < g_rows_per_rank; col++) {
                 g_matrix_t[col][rank_iter*g_rows_per_rank + row] = temporary_row[col];
             }
         }
     }
-
     free(temporary_row);
 }
 
@@ -240,7 +241,7 @@ void write_single_file()
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
     int rank_offset = g_my_rank*(g_matrix_size*g_rows_per_rank*sizeof(CELL_TYPE));
-    for(unsigned int i = 0; i < g_rows_per_rank; i++)
+    for(int i = 0; i < g_rows_per_rank; i++)
     {
         int offset = i*(g_matrix_size*g_rows_per_rank*sizeof(CELL_TYPE));
         err = MPI_File_write_at_all(output_file, rank_offset + offset, g_matrix[i], g_matrix_size, MPI_UNSIGNED, &file_status);
@@ -264,7 +265,43 @@ void write_multiple_files()
 {
     MPI_Status file_status;
     MPI_File output_file;
-    MPI_Comm mpi_comm_file;
+    MPI_Comm comm_file;
+    int file_rank;
+    int file_comm_size;
+    int split_num = g_my_rank / g_ranks_write_per_file;
     
-    //SHARE FLIE
+    MPI_Comm_split(MPI_COMM_WORLD, split_num, g_my_rank, &comm_file);
+    MPI_Comm_rank(comm_file, &file_rank);
+    MPI_Comm_size(comm_file, &file_comm_size);
+    
+    char[30] filename;
+    sprintf(filename, "output%d", split_num);
+    
+    
+    unsigned int err = MPI_File_open(comm_file, filename, MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &output_file);
+    if (err != MPI_SUCCESS)
+    {
+        printf("MPI_FILE_OPEN ERROR PANIC\n");
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+    int rank_offset = g_my_rank*(g_matrix_size*g_rows_per_rank*sizeof(CELL_TYPE));
+    for(int i = 0; i < g_rows_per_rank; i++)
+    {
+        int offset = i*(g_matrix_size*g_rows_per_rank*sizeof(CELL_TYPE));
+        err = MPI_File_write_at(output_file, rank_offset + offset, g_matrix[i], g_matrix_size, MPI_UNSIGNED, &file_status);
+        if (err != MPI_SUCCESS)
+        {        
+            printf("MPI_FILE_WRITE ERROR PANIC\n");
+            MPI_Abort(MPI_COMM_WORLD, 1);
+        }
+    }
+    
+    err = MPI_File_close(&output_file);
+    if (err != MPI_SUCCESS)
+    {
+        printf("MPI_FILE_CLOSE ERROR PANIC\n");
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+    
+    MPI_Barrier(MPI_COMM_WORLD);
 }

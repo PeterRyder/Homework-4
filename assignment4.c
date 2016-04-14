@@ -183,7 +183,7 @@ void generate_matrix() {
         for(int rank_iter = 0; rank_iter < g_commsize; rank_iter++)
         {
             MPI_Request request;
-            MPI_Isend(&(g_matrix[row][rank_iter*g_rows_per_rank]), g_rows_per_rank, MPI_UNSIGNED, rank_iter, g_my_rank*rank_iter+rank_iter, MPI_COMM_WORLD, &request);
+            MPI_Isend(&(g_matrix[row][rank_iter*g_rows_per_rank]), g_rows_per_rank, MPI_UNSIGNED, rank_iter, g_my_rank*row+row, MPI_COMM_WORLD, &request);
             MPI_Request_free(&request);
         }
 	}
@@ -200,19 +200,21 @@ void print_matrix() {
 
 void compute_transpose() {
 	g_matrix_t = calloc(g_rows_per_rank, sizeof(CELL_TYPE *));
-    CELL_TYPE* temporary_row = calloc(g_rows_per_rank, sizeof(CELL_TYPE*));;
+    CELL_TYPE* temporary_row = calloc(g_rows_per_rank, sizeof(CELL_TYPE));;
+    for(unsigned int row = 0; row < g_rows_per_rank; row++)
+    {
+        g_matrix_t[row] = calloc(g_matrix_size, sizeof(CELL_TYPE));
+    }
 
     for (int rank_iter = 0; rank_iter < g_commsize; rank_iter++)
     {
         for (CELL_TYPE row = 0; row < g_rows_per_rank; row++) {
-            g_matrix_t[row] = calloc(g_matrix_size, sizeof(CELL_TYPE));
-            
             MPI_Request request;
             MPI_Status status;
             MPI_Irecv(temporary_row, g_rows_per_rank, MPI_UNSIGNED, rank_iter, rank_iter*row+row, MPI_COMM_WORLD, &request);
             MPI_Wait(&request, &status);
 
-            for (CELL_TYPE col = 0; col < g_matrix_size; col++) {
+            for (CELL_TYPE col = 0; col < g_rows_per_rank; col++) {
                 g_matrix_t[col][rank_iter*g_rows_per_rank + row] = temporary_row[col];
             }
         }
