@@ -257,7 +257,7 @@ void write_single_file()
     int rank_offset = g_my_rank*(g_matrix_size*g_rows_per_rank*sizeof(CELL_TYPE));
     for(int i = 0; i < g_rows_per_rank; i++)
     {
-        int offset = i*(g_matrix_size*g_rows_per_rank*sizeof(CELL_TYPE));
+        int offset = i*(g_matrix_size*sizeof(CELL_TYPE));
         err = MPI_File_write_at_all(output_file, rank_offset + offset, g_matrix[i], g_matrix_size, MPI_UNSIGNED, &file_status);
         if (err != MPI_SUCCESS)
         {        
@@ -301,7 +301,7 @@ void write_multiple_files()
     int rank_offset = g_my_rank*(g_matrix_size*g_rows_per_rank*sizeof(CELL_TYPE));
     for(int i = 0; i < g_rows_per_rank; i++)
     {
-        int offset = i*(g_matrix_size*g_rows_per_rank*sizeof(CELL_TYPE));
+        int offset = i*(g_matrix_size*sizeof(CELL_TYPE));
         err = MPI_File_write_at(output_file, rank_offset + offset, g_matrix[i], g_matrix_size, MPI_UNSIGNED, &file_status);
         if (err != MPI_SUCCESS)
         {        
