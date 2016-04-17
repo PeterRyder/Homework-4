@@ -31,8 +31,10 @@ void cleanup();
 
 /* GLOBAL VARS */
 unsigned long long start_cycle_time = 0;
-unsigned long long end_cycle_time = 0;
-unsigned long long total_cycle_time = 0;
+unsigned long long end_cycle_time_compute = 0;
+unsigned long long end_cycle_time_output = 0;
+unsigned long long total_cycle_time_compute = 0;
+unsigned long long total_cycle_time_output = 0;
 
 unsigned int g_ranks = -1;
 unsigned int g_threads_per_rank = 0;
@@ -71,19 +73,12 @@ int main(int argc, char* argv[]) {
 		return(-1);
 	}
 
-	/* create ranks here */
-	printf("Initializing MPI\n");
-
     //Begin counting cycle time
     start_cycle_time = GetTimeBase();
     
 	MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &g_commsize);
     MPI_Comm_rank(MPI_COMM_WORLD, &g_my_rank);
-
-//take this out when running with ranks
-    g_my_rank=0;
-    g_commsize=1; 
 
     g_ranks = g_commsize;
     g_rows_per_rank = g_matrix_size / g_commsize;
@@ -95,8 +90,10 @@ int main(int argc, char* argv[]) {
 
     InitDefault();
 
+#if DEBUG
     printf("Rank %d of %d has been started and a first Random Value of %lf\n", 
-	   g_my_rank, g_commsize, GenVal(g_my_rank));
+        g_my_rank, g_commsize, GenVal(g_my_rank));
+#endif
 
     MPI_Barrier(MPI_COMM_WORLD);
 
@@ -117,6 +114,9 @@ int main(int argc, char* argv[]) {
 	compute_transpose();
     MPI_Barrier(MPI_COMM_WORLD);
 
+    if (g_my_rank == 0)
+        printf("Finished Compute Transpose\n");
+
     pthread_t* threads;
     int** ends = calloc(g_threads_per_rank, sizeof(int*));
     unsigned int i;
@@ -134,9 +134,14 @@ int main(int argc, char* argv[]) {
     for (i = 1; i < g_threads_per_rank; i++) {
         pthread_join(threads[i-1], NULL);
     }
-	//print_matrix();
 
 	MPI_Barrier(MPI_COMM_WORLD);
+
+    if (g_my_rank == 0)
+        end_cycle_time_compute = GetTimeBase();
+
+    if (g_my_rank == 0)
+        printf("Beginning write to file\n");
 
     //PRINT OUTPUT COMMENTED OUT UNTIL I GET A CHANCE TO TEST IT
     write_single_file();
@@ -157,8 +162,15 @@ int main(int argc, char* argv[]) {
     MPI_Finalize();
     
 // stop keeping time, and get the total cycle time
-    end_cycle_time = GetTimeBase();
-    total_cycle_time = end_cycle_time - start_cycle_time;
+    if (g_my_rank == 0) {
+        end_cycle_time_output = GetTimeBase();
+
+        total_cycle_time_output = end_cycle_time_output - end_cycle_time_compute;
+        total_cycle_time_compute = end_cycle_time_compute - start_cycle_time;
+
+        printf("Compute Cycle Time: %llu\n", total_cycle_time_compute);
+        printf("Output Cycle Time: %llu\n", total_cycle_time_output);        
+    }
 
 #if DEBUG
     if (g_my_rank == 0)
@@ -246,7 +258,7 @@ void write_single_file()
 {
     MPI_Status file_status;
     MPI_File output_file;
-    char* filename = "test_out.txt"; //REPLACE ME
+    char* filename = "test_out.txt";
     
     unsigned int err = MPI_File_open(MPI_COMM_WORLD, filename, MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &output_file);
     if (err != MPI_SUCCESS)
