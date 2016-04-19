@@ -11,6 +11,8 @@
 #include <limits.h>
 #include <pthread.h>
 
+#include <time.h>
+
 #include "clcg4.h"
 #include <mpi.h>
 
@@ -31,11 +33,9 @@ void write_multiple_files();
 void cleanup();
 
 /* GLOBAL VARS */
-unsigned long long start_cycle_time = 0;
-unsigned long long end_cycle_time = 0;
-unsigned long long total_cycle_time = 0;
+clock_t start_time, end_compute_time, end_output_time;
 
-unsigned int g_ranks = -1;
+unsigned int g_ranks = 0;
 unsigned int g_threads_per_rank = 0;
 unsigned int g_matrix_size = 0;
 unsigned int g_ranks_write_per_file = 1;
@@ -59,15 +59,10 @@ int main(int argc, char* argv[]) {
 	g_threads_per_rank = atoi(argv[1]);
 	g_matrix_size = atoi(argv[2]);
 
-	if (g_matrix_size <= 0 || g_ranks <= 0) {
+	if (g_matrix_size <= 0 || g_threads_per_rank <= 0) {
 		printf("Bad arguments\n");
 		return(-1);
 	}
-
-/* REMOVE FOR BLUE GENE
-    //Begin counting cycle time
-    start_cycle_time = GetTimeBase();
-*/
     
 	MPI_Init(&argc, &argv);
     MPI_Comm_size(MPI_COMM_WORLD, &g_commsize);
@@ -84,20 +79,36 @@ int main(int argc, char* argv[]) {
 
     InitDefault();
 
+#if DEBUG
     printf("Rank %d of %d has been started and a first Random Value of %lf\n", 
 	   g_my_rank, g_commsize, GenVal(g_my_rank));
+#endif
 
     MPI_Barrier(MPI_COMM_WORLD);
 
 	/* generate part of matrix for this rank */
 	generate_matrix();
 
+    if (g_my_rank == 0)
+        printf("Finished generating matrix\n");
+
 	MPI_Barrier(MPI_COMM_WORLD);
+
+    if (g_my_rank == 0) {
+        start_time = clock();
+        printf("start_time: %f\n"(double)start_time);
+    }
+
 
 	/* compute transpose */
 	compute_transpose();
 
+    if (g_my_rank == 0)
+        printf("Finished computing transpose\n");
+
+#if DEBUG
 	printf("Finished computing transpose\n");
+#endif
 
     MPI_Barrier(MPI_COMM_WORLD);
 
@@ -122,8 +133,22 @@ int main(int argc, char* argv[]) {
 
 	MPI_Barrier(MPI_COMM_WORLD);
 
-    //PRINT OUTPUT COMMENTED OUT UNTIL I GET A CHANCE TO TEST IT
+    if (g_my_rank == 0) {
+        end_compute_time = clock();
+        printf("end_compute_time: %f\n", (double)end_compute_time);
+    }
+
     write_single_file();
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    if (g_my_rank == 0) 
+        printf("Finished writing file\n");
+
+    if (g_my_rank == 0) {
+        end_output_time = clock();
+        printf("end_output_time %f\n", (double)end_output_time);
+    }
 /*    if( g_commsize <= g_ranks_write_per_file )
     {
         write_single_file(g_my_rank);
@@ -137,6 +162,14 @@ int main(int argc, char* argv[]) {
 #if DEBUG
 	printf("Matrix %d cleaned up\n", g_my_rank);
 #endif
+
+    if (g_my_rank == 0) {
+        double compute_time = (double)(end_compute_time - start_time) / CLOCKS_PER_SEC;
+        double output_time = (double)(end_output_time - end_compute_time) / CLOCKS_PER_SEC;
+    
+        printf("Compute Time: %f\n", compute_time);
+        printf("Output Time: %f\n", output_time);
+    }
 
     MPI_Finalize();
     
