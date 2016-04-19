@@ -149,15 +149,7 @@ int main(int argc, char* argv[]) {
         end_output_time = clock();
         printf("end_output_time %f\n", (double)end_output_time);
     }
-/*    if( g_commsize <= g_ranks_write_per_file )
-    {
-        write_single_file(g_my_rank);
-    }
-    else
-    {
-        write_multiple_files(g_my_rank);
-    }*/
-    
+
 	cleanup();
 #if DEBUG
 	printf("Matrix %d cleaned up\n", g_my_rank);
@@ -172,12 +164,6 @@ int main(int argc, char* argv[]) {
     }
 
     MPI_Finalize();
-    
-// stop keeping time, and get the total cycle time
-/*
-    end_cycle_time = GetTimeBase();
-    total_cycle_time = end_cycle_time - start_cycle_time;
-*/
 
 #if DEBUG
     if (g_my_rank == 0)
@@ -260,6 +246,8 @@ void cleanup() {
 	free(g_matrix);
 }
 
+/*
+
 //1 single file for all MPI ranks, with 8MB block boundaries between rank using MPI File write at all collective IO operation.
 void write_single_file()
 {
@@ -338,3 +326,5 @@ void write_multiple_files()
     
     MPI_Barrier(MPI_COMM_WORLD);
 }
+
+*/

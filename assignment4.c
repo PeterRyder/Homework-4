@@ -112,6 +112,7 @@ int main(int argc, char* argv[]) {
 
 	/* compute transpose */
 	compute_transpose();
+    
     MPI_Barrier(MPI_COMM_WORLD);
 
     if (g_my_rank == 0)
@@ -139,20 +140,6 @@ int main(int argc, char* argv[]) {
 
     if (g_my_rank == 0)
         end_cycle_time_compute = GetTimeBase();
-
-    if (g_my_rank == 0)
-        printf("Beginning write to file\n");
-
-    //PRINT OUTPUT COMMENTED OUT UNTIL I GET A CHANCE TO TEST IT
-    write_single_file();
-/*    if( g_commsize <= g_ranks_write_per_file )
-    {
-        write_single_file(g_my_rank);
-    }
-    else
-    {
-        write_multiple_files(g_my_rank);
-    }*/
     
 	cleanup();
 #if DEBUG
@@ -253,6 +240,9 @@ void cleanup() {
 	free(g_matrix);
 }
 
+/*
+ *
+ *
 //1 single file for all MPI ranks, with 8MB block boundaries between rank using MPI File write at all collective IO operation.
 void write_single_file()
 {
@@ -285,6 +275,8 @@ void write_single_file()
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 }
+
+
 
 //# ranks share the same file using MPI File write at (non-collective write call) with 8MB block boundaries between ranks.
 void write_multiple_files()
@@ -331,3 +323,5 @@ void write_multiple_files()
     
     MPI_Barrier(MPI_COMM_WORLD);
 }
+
+*/
