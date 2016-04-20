@@ -129,25 +129,12 @@ int main(int argc, char* argv[]) {
     for (unsigned int i = 1; i < g_threads_per_rank; i++) {
         pthread_join(threads[i-1], NULL);
     }
-	//print_matrix();
 
 	MPI_Barrier(MPI_COMM_WORLD);
 
     if (g_my_rank == 0) {
         end_compute_time = clock();
         printf("end_compute_time: %f\n", (double)end_compute_time);
-    }
-
-    write_single_file();
-
-    MPI_Barrier(MPI_COMM_WORLD);
-
-    if (g_my_rank == 0) 
-        printf("Finished writing file\n");
-
-    if (g_my_rank == 0) {
-        end_output_time = clock();
-        printf("end_output_time %f\n", (double)end_output_time);
     }
 
 	cleanup();

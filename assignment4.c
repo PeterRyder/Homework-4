@@ -97,7 +97,6 @@ int main(int argc, char* argv[]) {
 
     MPI_Barrier(MPI_COMM_WORLD);
 
-
 #if DEBUG
     if (g_my_rank == 0)
     	printf("Rows per rank: %d\n", g_rows_per_rank);
@@ -107,8 +106,6 @@ int main(int argc, char* argv[]) {
 	generate_matrix();
 
 	MPI_Barrier(MPI_COMM_WORLD);
-
-	//print_matrix();
 
 	/* compute transpose */
 	compute_transpose();
