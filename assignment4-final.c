@@ -21,12 +21,43 @@
 #define MULTIPLIER 1000 /* will generate ints between 0 and multiplier */
 
 /* FUNCTION DEFINITIONS */
+
+/*
+ * Generates a matrix given a width and height size. Will generate numbers
+ * between 0 and the multiplier.
+ */
 void generate_matrix();
+
+/* 
+ * Will print the matrix to the console - not recommended for large matrices
+ */
 void print_matrix();
+
+/*
+ * Computes the transpose of the matrix given an input matrix. Communicates
+ * with other ranks to get data required to compute transpose
+ */
 void compute_transpose();
+
+/*
+ * Computes the sum of a given matrix and its transpose. Stores the new
+ * value in place in the original matrix
+ */
 void* sum(void* args);
+
+/*
+ * Writes a matrix to a single file using the MPI file operations
+ */
 void write_single_file();
+
+/*
+ * Writes the matrix to multiple files using the MPI file operation
+ */
 void write_multiple_files();
+
+/*
+ * Removes the matrix from memory
+ */
 void cleanup();
 
 /* GLOBAL VARS */
@@ -111,11 +142,9 @@ int main(int argc, char* argv[]) {
 	if (g_my_rank == 0)
 	    printf("Finished generating matrix\n");
 
-	//print_matrix();
-
 	/* compute transpose */
 	compute_transpose();
-    
+
     MPI_Barrier(MPI_COMM_WORLD);
 
     if (g_my_rank == 0)
@@ -151,7 +180,7 @@ int main(int argc, char* argv[]) {
 
     MPI_Finalize();
     
-// stop keeping time, and get the total cycle time
+    /* stop keeping time, and get the total cycle time */
     if (g_my_rank == 0) {
         end_cycle_time_output = GetTimeBase();
 
@@ -181,9 +210,8 @@ void generate_matrix() {
 			g_matrix[row][col] = GenVal(g_my_rank) * MULTIPLIER;
 		}
  
-        //send row data to other ranks
-        for(int rank_iter = 0; rank_iter < g_commsize; rank_iter++)
-        {
+        /* send row data to other ranks */
+        for(int rank_iter = 0; rank_iter < g_commsize; rank_iter++) {
             MPI_Request request;
             MPI_Isend(&(g_matrix[row][rank_iter*g_rows_per_rank]), g_rows_per_rank, MPI_UNSIGNED, rank_iter, g_my_rank*row+row, MPI_COMM_WORLD, &request);
             MPI_Request_free(&request);
@@ -204,13 +232,11 @@ void print_matrix() {
 void compute_transpose() {
 	g_matrix_t = calloc(g_rows_per_rank, sizeof(CELL_TYPE *));
     CELL_TYPE* temporary_row = calloc(g_rows_per_rank, sizeof(CELL_TYPE));;
-    for(unsigned int row = 0; row < g_rows_per_rank; row++)
-    {
+    for(unsigned int row = 0; row < g_rows_per_rank; row++) {
         g_matrix_t[row] = calloc(g_matrix_size, sizeof(CELL_TYPE));
     }
 
-    for (int rank_iter = 0; rank_iter < g_commsize; rank_iter++)
-    {
+    for (int rank_iter = 0; rank_iter < g_commsize; rank_iter++) {
         for (CELL_TYPE row = 0; row < g_rows_per_rank; row++) {
             MPI_Request request;
             MPI_Status status;
@@ -240,8 +266,10 @@ void* sum(void* args) {
 void cleanup() {
 	for (CELL_TYPE row = 0; row < g_rows_per_rank; row++) {
 		free(g_matrix[row]);
+        free(g_matrix_t[row]);
 	}
 	free(g_matrix);
+    free(g_matrixt);
 }
 
 /*
@@ -255,26 +283,22 @@ void write_single_file()
     char* filename = "test_out.txt";
     
     unsigned int err = MPI_File_open(MPI_COMM_WORLD, filename, MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &output_file);
-    if (err != MPI_SUCCESS)
-    {
+    if (err != MPI_SUCCESS) {
         printf("MPI_FILE_OPEN ERROR PANIC\n");
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
     int rank_offset = g_my_rank*(g_matrix_size*g_rows_per_rank*sizeof(CELL_TYPE));
-    for(int i = 0; i < g_rows_per_rank; i++)
-    {
+    for(int i = 0; i < g_rows_per_rank; i++) {
         int offset = i*(g_matrix_size*sizeof(CELL_TYPE));
         err = MPI_File_write_at_all(output_file, rank_offset + offset, g_matrix[i], g_matrix_size, MPI_UNSIGNED, &file_status);
-        if (err != MPI_SUCCESS)
-        {        
+        if (err != MPI_SUCCESS) {        
             printf("MPI_FILE_WRITE ERROR PANIC\n");
             MPI_Abort(MPI_COMM_WORLD, 1);
         }
     }
     
     err = MPI_File_close(&output_file);
-    if (err != MPI_SUCCESS)
-    {
+    if (err != MPI_SUCCESS) {
         printf("MPI_FILE_CLOSE ERROR PANIC\n");
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
@@ -301,26 +325,22 @@ void write_multiple_files()
     
     
     unsigned int err = MPI_File_open(comm_file, filename, MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &output_file);
-    if (err != MPI_SUCCESS)
-    {
+    if (err != MPI_SUCCESS) {
         printf("MPI_FILE_OPEN ERROR PANIC\n");
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
     int rank_offset = g_my_rank*(g_matrix_size*g_rows_per_rank*sizeof(CELL_TYPE));
-    for(int i = 0; i < g_rows_per_rank; i++)
-    {
+    for(int i = 0; i < g_rows_per_rank; i++) {
         int offset = i*(g_matrix_size*sizeof(CELL_TYPE));
         err = MPI_File_write_at(output_file, rank_offset + offset, g_matrix[i], g_matrix_size, MPI_UNSIGNED, &file_status);
-        if (err != MPI_SUCCESS)
-        {        
+        if (err != MPI_SUCCESS) {        
             printf("MPI_FILE_WRITE ERROR PANIC\n");
             MPI_Abort(MPI_COMM_WORLD, 1);
         }
     }
     
     err = MPI_File_close(&output_file);
-    if (err != MPI_SUCCESS)
-    {
+    if (err != MPI_SUCCESS) {
         printf("MPI_FILE_CLOSE ERROR PANIC\n");
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
